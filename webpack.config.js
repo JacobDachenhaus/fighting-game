@@ -23,7 +23,7 @@ module.exports = {
     devtool: "inline-source-map",
     target: "web",
     devServer: {
-        static: path.join(__dirname, "build")
+        static: path.join(__dirname, "assets")
     },
     plugins: [
         new HtmlWebpackPlugin()

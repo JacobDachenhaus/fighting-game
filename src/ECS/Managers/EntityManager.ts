@@ -1,22 +1,23 @@
 // http://entity-systems.wikidot.com/rdbms-with-code-in-systems
 // http://entity-systems.wikidot.com/rdbms-beta
 import { v4 as uuidv4 } from "uuid";
-import { Component } from "./Component";
-import { ComponentType } from "./ComponentType";
-import { Entity } from "./Entity";
+import { Class } from "../Core/Class";
+import { Component } from "../Core/Component";
 
 export class EntityManager {
     public frozen: boolean;
-    public allEntities: Set<Entity>;
-    public componentStores: Map<ComponentType, Map<Entity, Component>>;
+    public allEntities: Set<string>;
+    public entityHumanReadableNames: Map<string, string>;
+    public componentStores: Map<Class<any>, Map<string, Component>>;
 
     constructor() {
         this.frozen = false;
         this.allEntities = new Set();
+        this.entityHumanReadableNames = new Map();
         this.componentStores = new Map();
     }
 
-    public getComponent(entity: Entity, componentType: ComponentType): Component {
+    public getComponent<T extends Component>(entity: string, componentType: Class<T>): T {
         const store = this.componentStores.get(componentType);
 
         if (!store) {
@@ -29,15 +30,15 @@ export class EntityManager {
             throw new Error();
         }
 
-        return result;
+        return result as T;
     }
 
-    public removeComponent(entity: Entity, component: Component): void {
+    public removeComponent<T extends Component>(entity: string, component: T): void {
         if (this.frozen) {
             throw new Error();
         }
 
-        const store = this.componentStores.get(component.getComponentType());
+        const store = this.componentStores.get(component.getClass());
 
         if (!store) {
             throw new Error();
@@ -50,8 +51,8 @@ export class EntityManager {
         }
     }
 
-    public hasComponent(entity: Entity, component: Component): boolean {
-        const store = this.componentStores.get(component.getComponentType());
+    public hasComponent<T extends Component>(entity: string, component: T): boolean {
+        const store = this.componentStores.get(component.getClass());
 
         if (!store) {
             return false;
@@ -60,7 +61,7 @@ export class EntityManager {
         return store.has(entity);
     }
 
-    public getAllComponentsOnEntity(entity: Entity): Component[] {
+    public getAllComponentsOnEntity(entity: string): Component[] {
         const components: Component[] = [];
 
         for (const store of this.componentStores.values()) {
@@ -74,17 +75,17 @@ export class EntityManager {
         return components;
     }
 
-    public getAllComponentsOfType(componentType: ComponentType): Component[] {
+    public getAllComponentsOfType<T extends Component>(componentType: Class<T>): T[] {
         const store = this.componentStores.get(componentType);
 
         if (!store) {
             return [];
         }
 
-        return Array.from(store.values());
+        return Array.from(store.values()) as T[];
     }
 
-    public getAllEntitiesPosessingComponent(componentType: ComponentType): Entity[] {
+    public getAllEntitiesPosessingComponent<T extends Component>(componentType: Class<T>): string[] {
         const store = this.componentStores.get(componentType);
 
         if (!store) {
@@ -94,33 +95,51 @@ export class EntityManager {
         return Array.from(store.keys());
     }
 
-    public addComponent(entity: Entity, component: Component): void {
+    public addComponent<T extends Component>(entity: string, component: T): void {
         if (this.frozen) {
             throw new Error();
         }
 
-        let store = this.componentStores.get(component.getComponentType());
+        let store = this.componentStores.get(component.getClass());
 
         if (!store) {
             store = new Map();
-            this.componentStores.set(component.getComponentType(), store);
+            this.componentStores.set(component.getClass(), store);
         }
 
         store.set(entity, component);
     }
 
-    public createEntity(): Entity {
+    public createEntity(name?: string): string {
         if (this.frozen) {
             throw new Error();
         }
 
-        const uuid: string = uuidv4();
-        this.allEntities.add(uuid);
+        const entity: string = uuidv4();
+        this.allEntities.add(entity);
 
-        return uuid;
+        if (name) {
+            this.entityHumanReadableNames.set(entity, name);
+        }
+
+        return entity;
     }
 
-    public killEntity(entity: Entity): void {
+    public setEntityName(entity: string, name: string): void {
+        this.entityHumanReadableNames.set(entity, name);
+    }
+
+    public nameFor(entity: string): string {
+        const name = this.entityHumanReadableNames.get(entity);
+
+        if (!name) {
+            throw new Error();
+        }
+
+        return name;
+    }
+
+    public killEntity(entity: string): void {
         if (this.frozen) {
             throw new Error();
         }
@@ -128,6 +147,7 @@ export class EntityManager {
         for (const componentStore of this.componentStores.values()) {
             componentStore.delete(entity);
         }
+
         this.allEntities.delete(entity);
     }
 
