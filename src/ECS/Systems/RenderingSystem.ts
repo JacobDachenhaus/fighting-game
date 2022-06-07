@@ -1,18 +1,10 @@
+import { Collider } from "../Components/Collider";
 import { Transform } from "../Components/Transform";
-import { Renderable } from "../Components/Renderable";
 import { EntityManager } from "../Managers/EntityManager";
-import { ISystem } from "../Core/System";
-import { BoxCollider } from "../Components/BoxCollider";
-import { Sprite } from "../Components/Sprite";
+import { System } from "../Core/System";
 
-export enum Colors {
-    BLACK = "#000",
-    RED = "#ff0000",
-    GREEN = "#00ff00",
-    BLUE = "#0000ff"
-}
-
-export class RenderingSystem implements ISystem {
+export class RenderingSystem implements System {
+    public requiredComponentTypes: Type<any>[] = [Transform];
     public entityManager: EntityManager;
     public ctx: CanvasRenderingContext2D;
 
@@ -21,31 +13,31 @@ export class RenderingSystem implements ISystem {
         this.ctx = ctx;
     }
 
-    public processOneGameTick(dt: number): void {
-        const canvas = this.ctx.canvas;
-
+    onUpdate(dt: number): void {
         // Clear canvas
-        this.ctx.fillStyle = Colors.BLACK;
+        const canvas = this.ctx.canvas;
+        this.ctx.fillStyle = "#000";
         this.ctx.fillRect(-canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
 
-        const renderableEntities = this.entityManager.getAllEntitiesPosessingComponent(Renderable);
-        renderableEntities.forEach((entity) => {
-            const transform = this.entityManager.getComponent(entity, Transform);
-            const sprite = this.entityManager.getComponent(entity, Sprite);
-            const boxCollider = this.entityManager.getComponent(entity, BoxCollider);
+        const requiredEntities = this.entityManager.getAllWithComponentsOfTypes(this.requiredComponentTypes);
+        requiredEntities.forEach((entity) => {
+            const transform = this.entityManager.getComponent(entity, Transform)!;
+            const collider = this.entityManager.getComponent(entity, Collider);
 
-            this.ctx.drawImage(sprite.image, transform.x, transform.y);
-
+            this.ctx.font = "10px sans-serif";
+            this.ctx.fillStyle = this.ctx.strokeStyle = collider?.isColliding
+                ? "#ff0000"
+                : "#00ff00";
+            
             // Draw collision boxes
-            this.ctx.strokeStyle = Colors.GREEN;
-            this.ctx.strokeRect(transform.x, transform.y, boxCollider.width, boxCollider.height);
+            if (collider) {
+                this.ctx.strokeRect(transform.position.x + collider.offset.x, transform.position.y + collider.offset.y, collider.width, collider.height);
+            }
 
-            // Draw labels
+            // Draw names
             const name = this.entityManager.nameFor(entity);
             if (name) {
-                this.ctx.font = "11px sans-serif";
-                this.ctx.fillStyle = Colors.GREEN;
-                this.ctx.fillText(name, transform.x, transform.y, boxCollider.width);
+                this.ctx.fillText(name, transform.position.x, transform.position.y - 5, 100);
             }
         });
     }

@@ -1,105 +1,61 @@
 // http://entity-systems.wikidot.com/rdbms-with-code-in-systems
 // http://entity-systems.wikidot.com/rdbms-beta
 import { v4 as uuidv4 } from "uuid";
-import { Class } from "../Core/Class";
 import { Component } from "../Core/Component";
+import { MetaEntity } from "../Core/MetaEntity";
 
+/** Class that manages the relationships between entities and components */
 export class EntityManager {
-    public frozen: boolean;
-    public allEntities: Set<string>;
-    public entityHumanReadableNames: Map<string, string>;
-    public componentStores: Map<Class<any>, Map<string, Component>>;
+    public allEntities: Set<string> = new Set();
+    public humanReadableNames: Map<string, string> = new Map();
+    public componentStores: Map<Type<any>, Map<string, Component>> = new Map();
 
-    constructor() {
-        this.frozen = false;
-        this.allEntities = new Set();
-        this.entityHumanReadableNames = new Map();
-        this.componentStores = new Map();
+    /**
+     * Creates a new entity
+     * @param name - The human-readable `name` for this entity
+     * @returns The new entity
+     */
+    public createEntity(name?: string): string {
+        const entity = uuidv4();
+
+        if (name) {
+            this.humanReadableNames.set(entity, name);
+        }
+
+        return this.allEntities.add(entity) && entity;
     }
 
-    public getComponent<T extends Component>(entity: string, componentType: Class<T>): T {
-        const store = this.componentStores.get(componentType);
-
-        if (!store) {
-            throw new Error();
-        }
-
-        const result = store.get(entity);
-
-        if (!result) {
-            throw new Error();
-        }
-
-        return result as T;
+    /**
+     * Creates a new MetaEntity instance
+     * @param name - The human-readable `name` for this entity
+     * @returns The new `MetaEntity`
+     */
+    public createMetaEntity(name?: string): MetaEntity {
+        return new MetaEntity(this.createEntity(name), this);
     }
 
-    public removeComponent<T extends Component>(entity: string, component: T): void {
-        if (this.frozen) {
-            throw new Error();
+    /**
+     * Gets the human-readable name for a specified entity
+     * @param entity The entity
+     * @returns The `name` for the specified entity
+     */
+    public nameFor(entity: string): string | undefined {
+        const name = this.humanReadableNames.get(entity);
+
+        if (!name) {
+            return undefined;
         }
 
-        const store = this.componentStores.get(component.getClass());
-
-        if (!store) {
-            throw new Error();
-        }
-
-        const result = store.delete(entity);
-
-        if (!result) {
-            throw new Error();
-        }
+        return name;
     }
 
-    public hasComponent<T extends Component>(entity: string, component: T): boolean {
-        const store = this.componentStores.get(component.getClass());
-
-        if (!store) {
-            return false;
-        }
-
-        return store.has(entity);
-    }
-
-    public getAllComponentsOnEntity(entity: string): Component[] {
-        const components: Component[] = [];
-
-        for (const store of this.componentStores.values()) {
-            const component = store.get(entity);
-
-            if (component) {
-                components.push(component);
-            }
-        }
-
-        return components;
-    }
-
-    public getAllComponentsOfType<T extends Component>(componentType: Class<T>): T[] {
-        const store = this.componentStores.get(componentType);
-
-        if (!store) {
-            return [];
-        }
-
-        return Array.from(store.values()) as T[];
-    }
-
-    public getAllEntitiesPosessingComponent<T extends Component>(componentType: Class<T>): string[] {
-        const store = this.componentStores.get(componentType);
-
-        if (!store) {
-            return [];
-        }
-
-        return Array.from(store.keys());
-    }
-
-    public addComponent<T extends Component>(entity: string, component: T): void {
-        if (this.frozen) {
-            throw new Error();
-        }
-
+    /**
+     * Adds a component to an entity
+     * @param entity - The entity
+     * @param component - The component to be added to the entity
+     * @returns The `Component` that was added to the entity
+     */
+    public addComponent<T extends Component>(entity: string, component: T): T {
         let store = this.componentStores.get(component.getClass());
 
         if (!store) {
@@ -108,54 +64,112 @@ export class EntityManager {
         }
 
         store.set(entity, component);
+        return component;
     }
 
-    public createEntity(name?: string): string {
-        if (this.frozen) {
-            throw new Error();
+    /**
+     * Removes a component from an entity
+     * @param entity - The entity
+     * @param component - The component to be removed from the entity
+     * @returns `true` if the component existed on the entity and has been
+     *      removed, or `false` if the entity or component does not exist
+     */
+    public removeComponent<T extends Component>(entity: string, component: T): boolean {
+        const store = this.componentStores.get(component.getClass());
+
+        if (!store) {
+            return false; // No components of this type have been stored
         }
 
-        const entity: string = uuidv4();
-        this.allEntities.add(entity);
+        return store.delete(entity);
+    }
 
-        if (name) {
-            this.entityHumanReadableNames.set(entity, name);
+    /**
+     * Checks if an entity has a component of the specified type
+     * @param entity - The entity
+     * @param type - The component type to check for
+     * @returns `true` if the component existed on the entity, or `false` if the
+     *      entity or component does not exist
+     */
+    public hasComponentType<T extends Component>(entity: string, type: Type<T>): boolean {
+        const store = this.componentStores.get(type);
+
+        if (!store) {
+            return false; // No components of this type have been stored
         }
 
-        return entity;
+        return store.has(entity);
     }
 
-    public setEntityName(entity: string, name: string): void {
-        this.entityHumanReadableNames.set(entity, name);
-    }
-
-    public nameFor(entity: string): string {
-        const name = this.entityHumanReadableNames.get(entity);
-
-        if (!name) {
-            throw new Error();
+    /**
+     * Checks if an entity has components of the specified types
+     * @param entity - The entity
+     * @param types - The component types to check for
+     * @returns `true` if the components existed on the entity, or `false` if the
+     *      entity or components do not exist
+     */
+    public hasComponentTypes(entity: string, types: Type<any>[]): boolean {
+        if (types.length === 0) {
+            return true; // No types provided, defaults to `true`
         }
 
-        return name;
+        return types.every((type) => {
+            return this.hasComponentType(entity, type);
+        });
     }
 
-    public killEntity(entity: string): void {
-        if (this.frozen) {
-            throw new Error();
+    /**
+     * Gets all entities with a component of the specified type
+     * @param type - The component type
+     * @returns An `Array` of entities with a component of the specified type
+     */
+    public getAllWithComponentType<T extends Component>(type: Type<T>): string[] {
+        const store = this.componentStores.get(type);
+
+        if (!store) {
+            return []; // No components of this type have been stored
+        }
+        
+        return Array.from(store.keys());
+    }
+
+    /**
+     * Gets all entities with components of the specified types
+     * @param types - The component types
+     * @returns An `Array` of entities with components of the specified types
+     */
+    public getAllWithComponentsOfTypes(types: Type<any>[]): string[] {
+        const arr = Array.from(this.allEntities);
+        
+        if (types.length === 0) {
+            return arr; // No types provided, defaults to an `Array` containing all entities
         }
 
-        for (const componentStore of this.componentStores.values()) {
-            componentStore.delete(entity);
+        return arr.filter((entity) => {
+            return this.hasComponentTypes(entity, types);
+        });
+    }
+
+    /**
+     * Gets the component of a specified type from an entity
+     * @param entity - The entity
+     * @param type - The component type
+     * @returns The `Component` of the specified type, or `undefined` if it does
+     *      not exist
+     */
+    public getComponent<T extends Component>(entity: string, type: Type<T>): T | undefined {
+        const store = this.componentStores.get(type);
+
+        if (!store) {
+            return undefined;
         }
 
-        this.allEntities.delete(entity);
-    }
+        const component = store.get(entity);
 
-    public freeze(): void {
-        this.frozen = true;
-    }
+        if (!component) {
+            return undefined;
+        }
 
-    public unFreeze(): void {
-        this.frozen = false;
+        return component as T;
     }
 }

@@ -1,7 +1,9 @@
-import { Class } from "./Class";
-
-export class Component {
-    getClass(): Class<this> {
-        return this.constructor as Class<this>;
+/**
+ * Class used for checking types and inheritance of `Component` children
+ * @abstract
+ **/
+export abstract class Component {
+    public getClass(): Type<this> {
+        return this.constructor as Type<this>;
     }
 }

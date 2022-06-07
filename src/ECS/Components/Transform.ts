@@ -1,17 +1,14 @@
 import { Component } from "../Core/Component";
 
-export interface ITransformData {
-    x: number;
-    y: number;
+export interface TransformOptions {
+    position: Vec2;
 }
 
 export class Transform extends Component {
-    public x: number;
-    public y: number;
+    public position: Vec2;
 
-    constructor(data: ITransformData) {
+    constructor({ position }: TransformOptions) {
         super();
-        this.x = data.x;
-        this.y = data.y;
+        this.position = position;
     }
 }
